@@ -1,0 +1,577 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+  <title>Bus Booking</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .form-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin: 5px 0;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    /* Bus Seat Layout Styles */
+    .bus-container {
+      background-color: #f8f8f8;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      padding: 20px;
+      width: 300px;
+      margin: 20px auto;
+      position: relative;
+    }
+    .seat {
+      width: 30px;
+      height: 30px;
+      background-color: #ddd;
+      border: 1px solid #999;
+      border-radius: 5px;
+      display: inline-block;
+      margin: 5px;
+      text-align: center;
+      line-height: 30px;
+      cursor: pointer;
+      position: relative;
+    }
+    .seat.available:hover {
+      background-color: #b3e6b3;
+    }
+    .seat.selected {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .seat.occupied {
+      background-color: #ff3333;
+      cursor: not-allowed;
+      color: white;
+    }
+    .seat.occupied::after {
+      content: 'X';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+    .seat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .aisle {
+      width: 20px;
+      display: inline-block;
+    }
+    .driver {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Bus Booking</h2>
+
+    <h3>Bus Seat Selection</h3>
+    <div id="seatSelection">
+      <div class="form-group">
+        <label for="date">Select Date:</label>
+        <input type="date" id="date" required>
+      </div>
+      <div class="bus-container">
+        <div class="driver"></div>
+        <div id="seatMap"></div>
+      </div>
+    </div>
+
+    <h3>Booking Form</h3>
+    <form id="bookingForm" style="display:none;">
+      <div class="form-group">
+        <label for="name">Name:</label>
+        <input type="text" id="name" required>
+      </div>
+      <div class="form-group">
+        <label for="age">Age:</label>
+        <input type="number" id="age" required>
+      </div>
+      <div class="form-group">
+        <label for="noOfPassengers">Number of Passengers:</label>
+        <input type="number" id="noOfPassengers" required readonly>
+      </div>
+      <div class="form-group">
+        <label for="additionalDetails">Additional Details:</label>
+        <textarea id="additionalDetails" rows="4"></textarea>
+      </div>
+      <button type="button" onclick="submitBooking()">Confirm Booking</button>
+    </form>
+  </div>
+
+  <script>
+    let selectedSeats = [];
+    const user = JSON.parse(localStorage.getItem('user'));
+    const defaultVehicle = { id: 1, name: 'Standard Bus', seats: 40 }; // Default bus configuration
+
+    // Function to load the page and set up date input
+    function loadPage() {
+      if (!user) {
+        alert('Please log in to book a vehicle.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      // Set min date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').setAttribute('min', today);
+      document.getElementById('date').value = today;
+
+      // Generate seat map for today's date
+      fetchBookedSeats(today, () => generateSeatMap(defaultVehicle.seats));
+
+      // Add event listener for date change
+      document.getElementById('date').addEventListener('change', (e) => {
+        const selectedDate = e.target.value;
+        fetchBookedSeats(selectedDate, () => generateSeatMap(defaultVehicle.seats));
+      });
+    }
+
+    // Function to fetch booked seats for a specific date
+    function fetchBookedSeats(date, callback) {
+      fetch(`/api/booked-seats/${defaultVehicle.id}/${date}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            window.bookedSeats = data.bookedSeats || [];
+          } else {
+            window.bookedSeats = [];
+            console.error('Error fetching booked seats:', data.message);
+          }
+          callback();
+        })
+        .catch(error => {
+          console.error('Error fetching booked seats:', error);
+          window.bookedSeats = [];
+          callback();
+        });
+    }
+
+    // Function to generate seat map (2x2 layout with aisle)
+    function generateSeatMap(totalSeats) {
+      const seatMap = document.getElementById('seatMap');
+      seatMap.innerHTML = '';
+      selectedSeats = [];
+      document.getElementById('noOfPassengers').value = 0;
+      document.getElementById('bookingForm').style.display = 'none';
+
+      const rows = Math.ceil(totalSeats / 4);
+      for (let i = 0; i < rows; i++) {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'seat-row';
+
+        for (let j = 1; j <= 4; j++) {
+          const seatNumber = i * 4 + j;
+          if (seatNumber > totalSeats) break;
+
+          const seat = document.createElement('div');
+          const isBooked = window.bookedSeats.includes(seatNumber);
+          seat.className = isBooked ? 'seat occupied' : 'seat available';
+          seat.innerText = seatNumber;
+          if (!isBooked) {
+            seat.onclick = () => toggleSeat(seat, seatNumber);
+          }
+          rowDiv.appendChild(seat);
+
+          if (j === 2) {
+            const aisle = document.createElement('div');
+            aisle.className = 'aisle';
+            rowDiv.appendChild(aisle);
+          }
+        }
+        seatMap.appendChild(rowDiv);
+      }
+    }
+
+    // Function to toggle seat selection
+    function toggleSeat(seat, seatNumber) {
+      if (seat.classList.contains('occupied')) return;
+
+      if (seat.classList.contains('selected')) {
+        seat.classList.remove('selected');
+        selectedSeats = selectedSeats.filter(num => num !== seatNumber);
+        document.getElementById('bookingForm').style.display = 'none';
+      } else {
+        seat.classList.add('selected');
+        selectedSeats.push(seatNumber);
+        document.getElementById('bookingForm').style.display = 'block';
+      }
+
+      document.getElementById('noOfPassengers').value = selectedSeats.length;
+    }
+
+    // Function to handle booking submission
+    function submitBooking() {
+      const name = document.getElementById('name').value;
+      const age = document.getElementById('age').value;
+      const noOfPassengers = document.getElementById('noOfPassengers').value;
+      const date = document.getElementById('date').value;
+      const additionalDetails = document.getElementById('additionalDetails').value;
+
+      if (!name || !age || !noOfPassengers || !date) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+
+      fetch('/api/booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          vehicleId: defaultVehicle.id,
+          date: date, // Send only date (YYYY-MM-DD)
+          name: name,
+          age: age,
+          noOfPassengers: noOfPassengers,
+          selectedSeats: selectedSeats,
+          additionalDetails: additionalDetails
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            window.location.href = 'thankyou.html';
+          } else {
+            alert(`Booking failed: ${data.message || 'Please try again.'}`);
+          }
+        })
+        .catch(error => {
+          console.error('Error submitting booking:', error);
+          alert('An error occurred. Please try again.');
+        });
+    }
+
+    window.onload = loadPage;
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9345def5aec3add8',t:'MTc0NTMzMjc3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bus Booking</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .form-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin: 5px 0;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    /* Bus Seat Layout Styles */
+    .bus-container {
+      background-color: #f8f8f8;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      padding: 20px;
+      width: 300px;
+      margin: 20px auto;
+      position: relative;
+    }
+    .seat {
+      width: 30px;
+      height: 30px;
+      background-color: #ddd;
+      border: 1px solid #999;
+      border-radius: 5px;
+      display: inline-block;
+      margin: 5px;
+      text-align: center;
+      line-height: 30px;
+      cursor: pointer;
+      position: relative;
+    }
+    .seat.available:hover {
+      background-color: #b3e6b3;
+    }
+    .seat.selected {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .seat.occupied {
+      background-color: #ff3333;
+      cursor: not-allowed;
+      color: white;
+    }
+    .seat.occupied::after {
+      content: 'X';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+    .seat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .aisle {
+      width: 20px;
+      display: inline-block;
+    }
+    .driver {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Bus Booking</h2>
+
+    <h3>Bus Seat Selection</h3>
+    <div id="seatSelection">
+      <div class="form-group">
+        <label for="date">Select Date:</label>
+        <input type="date" id="date" required>
+      </div>
+      <div class="form-group">
+        <label for="time">Select Time:</label>
+        <select id="time" required>
+          <option value="" disabled selected>Select a time</option>
+          <option value="00:00:00">1:00  AM ( CHENNAI ----> HYDERABAD )</option>
+          <option value="12:00:00">12:00 PM ( HYDERABAD ----> CHENNAI )</option>
+          <option value="18:00:00">6:00  PM ( MADURAI ----> NEW DELHI )</option>
+          <option value="10:00:00">10:00 AM ( MADURAI ----> CHENNAI )</option>
+        </select>
+      </div>
+      <div class="bus-container">
+        <div class="driver"></div>
+        <div id="seatMap"></div>
+      </div>
+    </div>
+
+    <h3>Booking Form</h3>
+    <form id="bookingForm" style="display:none;">
+      <div class="form-group">
+        <label for="name">Name:</label>
+        <input type="text" id="name" required>
+      </div>
+      <div class="form-group">
+        <label for="age">Age:</label>
+        <input type="number" id="age" required>
+      </div>
+      <div class="form-group">
+        <label for="noOfPassengers">Number of Passengers:</label>
+        <input type="number" id="noOfPassengers" required readonly>
+      </div>
+      <div class="form-group">
+        <label for="additionalDetails">Additional Details:</label>
+        <textarea id="additionalDetails" rows="4"></textarea>
+      </div>
+      <button type="button" onclick="submitBooking()">Confirm Booking</button>
+    </form>
+  </div>
+
+  <script>
+    let selectedSeats = [];
+    const user = JSON.parse(localStorage.getItem('user'));
+    const defaultVehicle = { id: 1, name: 'Standard Bus', seats: 40 }; // Default bus configuration
+
+    // Function to load the page and set up date input
+    function loadPage() {
+      if (!user) {
+        alert('Please log in to book a vehicle.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      // Set min date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').setAttribute('min', today);
+      document.getElementById('date').value = today;
+
+      // Generate seat map for today's date and default time
+      fetchBookedSeats(today, document.getElementById('time').value || '00:00:00', () => generateSeatMap(defaultVehicle.seats));
+
+      // Add event listeners for date and time change
+      document.getElementById('date').addEventListener('change', updateSeatMap);
+      document.getElementById('time').addEventListener('change', updateSeatMap);
+    }
+
+    // Function to update seat map on date or time change
+    function updateSeatMap() {
+      const selectedDate = document.getElementById('date').value;
+      const selectedTime = document.getElementById('time').value;
+      if (selectedDate && selectedTime) {
+        fetchBookedSeats(selectedDate, selectedTime, () => generateSeatMap(defaultVehicle.seats));
+      }
+    }
+
+    // Function to fetch booked seats for a specific date and time
+    function fetchBookedSeats(date, time, callback) {
+      fetch(`/api/booked-seats/${defaultVehicle.id}/${date}/${time}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            window.bookedSeats = data.bookedSeats || [];
+          } else {
+            window.bookedSeats = [];
+            console.error('Error fetching booked seats:', data.message);
+          }
+          callback();
+        })
+        .catch(error => {
+          console.error('Error fetching booked seats:', error);
+          window.bookedSeats = [];
+          callback();
+        });
+    }
+
+    // Function to generate seat map (2x2 layout with aisle)
+    function generateSeatMap(totalSeats) {
+      const seatMap = document.getElementById('seatMap');
+      seatMap.innerHTML = '';
+      selectedSeats = [];
+      document.getElementById('noOfPassengers').value = 0;
+      document.getElementById('bookingForm').style.display = 'none';
+
+      const rows = Math.ceil(totalSeats / 4);
+      for (let i = 0; i < rows; i++) {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'seat-row';
+
+        for (let j = 1; j <= 4; j++) {
+          const seatNumber = i * 4 + j;
+          if (seatNumber > totalSeats) break;
+
+          const seat = document.createElement('div');
+          const isBooked = window.bookedSeats.includes(seatNumber);
+          seat.className = isBooked ? 'seat occupied' : 'seat available';
+          seat.innerText = seatNumber;
+          if (!isBooked) {
+            seat.onclick = () => toggleSeat(seat, seatNumber);
+          }
+          rowDiv.appendChild(seat);
+
+          if (j === 2) {
+            const aisle = document.createElement('div');
+            aisle.className = 'aisle';
+            rowDiv.appendChild(aisle);
+          }
+        }
+        seatMap.appendChild(rowDiv);
+      }
+    }
+
+    // Function to toggle seat selection
+    function toggleSeat(seat, seatNumber) {
+      if (seat.classList.contains('occupied')) return;
+
+      if (seat.classList.contains('selected')) {
+        seat.classList.remove('selected');
+        selectedSeats = selectedSeats.filter(num => num !== seatNumber);
+        document.getElementById('bookingForm').style.display = 'none';
+      } else {
+        seat.classList.add('selected');
+        selectedSeats.push(seatNumber);
+        document.getElementById('bookingForm').style.display = 'block';
+      }
+
+      document.getElementById('noOfPassengers').value = selectedSeats.length;
+    }
+
+    // Function to handle booking submission
+    function submitBooking() {
+      const name = document.getElementById('name').value;
+      const age = document.getElementById('age').value;
+      const noOfPassengers = document.getElementById('noOfPassengers').value;
+      const date = document.getElementById('date').value;
+      const time = document.getElementById('time').value;
+      const additionalDetails = document.getElementById('additionalDetails').value;
+
+      if (!name || !age || !noOfPassengers || !date || !time) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+
+      // Combine date and time for the API
+      const dateTime = `${date} ${time}`;
+
+      fetch('/api/booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          vehicleId: defaultVehicle.id,
+          date: dateTime,
+          name: name,
+          age: age,
+          noOfPassengers: noOfPassengers,
+          selectedSeats: selectedSeats,
+          additionalDetails: additionalDetails
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            window.location.href = 'thankyou.html';
+          } else {
+            alert(`Booking failed: ${data.message || 'Please try again.'}`);
+          }
+        })
+        .catch(error => {
+          console.error('Error submitting booking:', error);
+          alert('An error occurred. Please try again.');
+        });
+    }
+
+    window.onload = loadPage;
+  </script>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmed</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🎉 Booking Confirmed!</h1>
+    <p>Thank you for booking with us.</p>
+    <p>Your vehicle is now reserved. Below are your booking details:</p>
+
+    <h3>Booking Details</h3>
+    <table id="bookingTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Vehicle</th>
+          <th>Date & Time</th>
+          <th>Seat Numbers</th>
+          <th>Age</th>
+          <th>No. of Passengers</th>
+          <th>Additional Details</th>
+        </tr>
+      </thead>
+      <tbody id="bookingTableBody">
+        <!-- Booking details will be inserted here -->
+      </tbody>
+    </table>
+
+    <div style="margin-top: 20px;">
+      <button onclick="logout()" class="button">Logout</button>
+    </div>
+  </div>
+
+  <script>
+    // Fetch booking details when the page loads
+    window.onload = function () {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        alert('No user found. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      fetch(`/api/booking/${user.id}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.booking) {
+            displayBookingDetails(data.booking);
+          } else {
+            document.getElementById('bookingTableBody').innerHTML = `
+              <tr>
+                <td colspan="7">No booking details found.</td>
+              </tr>
+            `;
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching booking details:', error);
+          alert('An error occurred while fetching booking details.');
+        });
+
+      // Disable back button
+      window.history.pushState(null, document.title, window.location.href);
+      window.onpopstate = function () {
+        window.history.pushState(null, document.title, window.location.href);
+      };
+    };
+
+    // Function to display booking details in the table
+    function displayBookingDetails(booking) {
+      const tableBody = document.getElementById('bookingTableBody');
+      tableBody.innerHTML = ''; // Clear any existing content
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${booking.name || 'N/A'}</td>
+        <td>${booking.vehicle_name || 'N/A'}</td>
+        <td>${new Date(booking.date).toLocaleString()}</td>
+        <td>${booking.seat_numbers ? booking.seat_numbers.join(', ') : 'N/A'}</td>
+        <td>${booking.age || 'N/A'}</td>
+        <td>${booking.no_of_passengers || 'N/A'}</td>
+        <td>${booking.additional_details || 'N/A'}</td>
+      `;
+      tableBody.appendChild(row);
+    }
+
+    // Logout function
+    function logout() {
+      localStorage.removeItem('user');
+      window.location.replace('login.html'); // Replace history to prevent back
+    }
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9345def6ed54bfd6',t:'MTc0NTMzMjc3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'934620d3cf80ad82',t:'MTc0NTMzNTQ2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
